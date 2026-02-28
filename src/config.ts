@@ -6,13 +6,18 @@ import { readEnvFile } from './env.js';
 // Read config values from .env (falls back to process.env).
 // Secrets are NOT read here — they stay on disk and are loaded only
 // where needed (container-runner.ts) to avoid leaking to child processes.
-const envConfig = readEnvFile(['ASSISTANT_NAME', 'ASSISTANT_HAS_OWN_NUMBER']);
+const envConfig = readEnvFile([
+  'ASSISTANT_NAME',
+  'STATUS_PORT',
+  'STATUS_KEY_UID',
+  'STATUS_PASSWORD',
+  'STATUS_DATA_DIR',
+  'STATUS_PROFILE_NAME',
+  'STATUS_ALLOW_FROM',
+]);
 
 export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
-export const ASSISTANT_HAS_OWN_NUMBER =
-  (process.env.ASSISTANT_HAS_OWN_NUMBER ||
-    envConfig.ASSISTANT_HAS_OWN_NUMBER) === 'true';
 export const POLL_INTERVAL = 2000;
 export const SCHEDULER_POLL_INTERVAL = 60000;
 
@@ -62,3 +67,27 @@ export const TRIGGER_PATTERN = new RegExp(
 // Uses system timezone by default
 export const TIMEZONE =
   process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// Status messenger config
+export const STATUS_PORT = parseInt(
+  process.env.STATUS_PORT || envConfig.STATUS_PORT || '21405',
+  10,
+);
+export const STATUS_KEY_UID =
+  process.env.STATUS_KEY_UID || envConfig.STATUS_KEY_UID || '';
+export const STATUS_PASSWORD =
+  process.env.STATUS_PASSWORD || envConfig.STATUS_PASSWORD || '';
+export const STATUS_DATA_DIR =
+  process.env.STATUS_DATA_DIR ||
+  envConfig.STATUS_DATA_DIR ||
+  `${HOME_DIR}/.status-backend/data`;
+export const STATUS_PROFILE_NAME =
+  process.env.STATUS_PROFILE_NAME || envConfig.STATUS_PROFILE_NAME || '';
+export const STATUS_ALLOW_FROM: string[] = (
+  process.env.STATUS_ALLOW_FROM ||
+  envConfig.STATUS_ALLOW_FROM ||
+  ''
+)
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
