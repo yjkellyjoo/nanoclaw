@@ -36,7 +36,7 @@ describe('parameterized SQL registration', () => {
        (jid, name, folder, trigger_pattern, added_at, container_config, requires_trigger)
        VALUES (?, ?, ?, ?, ?, NULL, ?)`,
     ).run(
-      '123@g.us',
+      'community-abc123',
       'Test Group',
       'test-group',
       '@Andy',
@@ -46,7 +46,7 @@ describe('parameterized SQL registration', () => {
 
     const row = db
       .prepare('SELECT * FROM registered_groups WHERE jid = ?')
-      .get('123@g.us') as {
+      .get('community-abc123') as {
       jid: string;
       name: string;
       folder: string;
@@ -54,7 +54,7 @@ describe('parameterized SQL registration', () => {
       requires_trigger: number;
     };
 
-    expect(row.jid).toBe('123@g.us');
+    expect(row.jid).toBe('community-abc123');
     expect(row.name).toBe('Test Group');
     expect(row.folder).toBe('test-group');
     expect(row.trigger_pattern).toBe('@Andy');
@@ -69,7 +69,7 @@ describe('parameterized SQL registration', () => {
        (jid, name, folder, trigger_pattern, added_at, container_config, requires_trigger)
        VALUES (?, ?, ?, ?, ?, NULL, ?)`,
     ).run(
-      '456@g.us',
+      'community-def456',
       name,
       'obriens-group',
       '@Andy',
@@ -79,7 +79,7 @@ describe('parameterized SQL registration', () => {
 
     const row = db
       .prepare('SELECT name FROM registered_groups WHERE jid = ?')
-      .get('456@g.us') as {
+      .get('community-def456') as {
       name: string;
     };
 
@@ -115,7 +115,7 @@ describe('parameterized SQL registration', () => {
        (jid, name, folder, trigger_pattern, added_at, container_config, requires_trigger)
        VALUES (?, ?, ?, ?, ?, NULL, ?)`,
     ).run(
-      '789@s.whatsapp.net',
+      '0xabcdef1234567890',
       'Personal',
       'main',
       '@Andy',
@@ -125,7 +125,7 @@ describe('parameterized SQL registration', () => {
 
     const row = db
       .prepare('SELECT requires_trigger FROM registered_groups WHERE jid = ?')
-      .get('789@s.whatsapp.net') as { requires_trigger: number };
+      .get('0xabcdef1234567890') as { requires_trigger: number };
 
     expect(row.requires_trigger).toBe(0);
   });
@@ -138,7 +138,7 @@ describe('parameterized SQL registration', () => {
     );
 
     stmt.run(
-      '123@g.us',
+      'community-upsert001',
       'Original',
       'main',
       '@Andy',
@@ -146,7 +146,7 @@ describe('parameterized SQL registration', () => {
       1,
     );
     stmt.run(
-      '123@g.us',
+      'community-upsert001',
       'Updated',
       'main',
       '@Bot',

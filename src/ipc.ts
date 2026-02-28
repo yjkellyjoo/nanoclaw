@@ -331,6 +331,10 @@ export async function processTaskIpc(
           { sourceGroup },
           'Group metadata refresh requested via IPC',
         );
+        logger.info(
+          { sourceGroup },
+          'Running metadata sync for refresh_groups',
+        );
         await deps.syncGroupMetadata(true);
         // Write updated snapshot immediately
         const availableGroups = deps.getAvailableGroups();

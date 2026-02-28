@@ -45,7 +45,7 @@ describe('registered groups DB query', () => {
       `INSERT INTO registered_groups (jid, name, folder, trigger_pattern, added_at, requires_trigger)
        VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(
-      '123@g.us',
+      'community-abc123',
       'Group 1',
       'group-1',
       '@Andy',
@@ -57,7 +57,7 @@ describe('registered groups DB query', () => {
       `INSERT INTO registered_groups (jid, name, folder, trigger_pattern, added_at, requires_trigger)
        VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(
-      '456@g.us',
+      'community-def456',
       'Group 2',
       'group-2',
       '@Andy',
@@ -104,7 +104,7 @@ describe('Docker detection logic', () => {
   });
 });
 
-describe('WhatsApp auth detection', () => {
+describe('Status auth detection', () => {
   it('detects non-empty auth directory logic', () => {
     // Simulate the check: directory exists and has files
     const hasAuth = (authDir: string) => {

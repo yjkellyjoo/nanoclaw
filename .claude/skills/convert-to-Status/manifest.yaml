@@ -1,0 +1,21 @@
+skill: convert-to-Status
+version: 1.0.0
+description: "Switch messaging channel from WhatsApp to Status (decentralized, E2E encrypted)"
+core_version: 0.1.0
+adds:
+  - src/channels/status.ts
+  - src/status-api.ts
+  - src/channels/status.test.ts
+  - src/status-api.test.ts
+  - src/trigger.ts
+  - src/trigger.test.ts
+  - scripts/status-login.sh
+  - scripts/restart-status-nanoclaw.sh
+modifies:
+  - src/index.ts
+  - src/config.ts
+  - package.json
+structured: {}
+conflicts: []
+depends: []
+test: "npx vitest run src/channels/status.test.ts src/status-api.test.ts src/trigger.test.ts"
