@@ -1,5 +1,7 @@
 <p align="center">
   <img src="assets/nanoclaw-logo.png" alt="NanoClaw" width="400">
+  <br><br>
+  <img src="https://res.cloudinary.com/dhgck7ebz/image/upload/f_auto,c_limit,w_320,q_auto/Brand/Logo%20Section/Logo/Logo_01" alt="Status" width="200">
 </p>
 
 <p align="center">
@@ -38,20 +40,37 @@ NanoClaw already isolates your agents in containers so they can't touch your hos
 ## Quick Start
 
 ```bash
-git clone https://github.com/yjkellyjoo/nanoclaw.git
+git clone https://github.com/YOUR_USERNAME/nanoclaw.git
 cd nanoclaw
 claude
 ```
 
 Then run `/setup`. Claude Code handles everything: dependencies, Status authentication, container setup and service configuration.
 
+> **Note:** Replace `YOUR_USERNAME` with your GitHub username if you've forked this repository.
+
 ### Status Setup
 
-1. Install [Status Desktop](https://status.app/get) and create an account
-2. Run `./scripts/status-login.sh` to authenticate NanoClaw with your Status account
-3. Set your `STATUS_KEY_UID` in the environment (your Status public key)
+**What is Status?**
+
+[Status](https://status.app) is a secure messaging app and crypto wallet built on Ethereum. Unlike WhatsApp or Telegram, Status is:
+- **Decentralized** - Messages route through [Waku](https://waku.org), a peer-to-peer network with no central servers
+- **Private** - Your identity is a cryptographic keypair, not a phone number. No one can see your metadata or communication patterns
+- **Open source** - [Fully auditable code](https://github.com/status-im) and protocol
+- **Censorship-resistant** - No central authority can block or monitor your messages
+
+Learn more: [status.app/features](https://status.app/features) | [Waku protocol docs](https://docs.waku.org)
+
+**Setup Instructions:**
+
+1. Install [Status Desktop](https://status.app/get) and create an account (save your recovery phrase securely!)
+2. Copy `.env.example` to `.env` and configure your Status credentials
+3. Run `/setup` via Claude Code - it will handle dependencies, authentication, and service configuration
+4. Run `./scripts/status-login.sh` to authenticate NanoClaw with your Status account
 
 That's it. No QR codes, no phone number verification, no Meta account required.
+
+For detailed configuration options, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ## Philosophy
 
