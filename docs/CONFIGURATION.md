@@ -55,8 +55,8 @@ NANOCLAW_PROJECT_DIR=/custom/path/to/nanoclaw ./scripts/status-login.sh
 
 ## Setup Checklist
 
-1. Install Status Desktop from [status.app/get](https://status.app/get)
-2. Create a Status account and save your recovery phrase securely
+1. Install Status ([Desktop](https://status.app/get) or [Mobile](https://status.app/get)) and create an account
+2. Save your recovery phrase securely offline
 3. Copy `.env.example` to `.env` in the project root
 4. Set `STATUS_KEY_UID` and `STATUS_PASSWORD` in `.env`
 5. Run `/setup` via Claude Code to complete installation

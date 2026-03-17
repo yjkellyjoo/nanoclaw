@@ -40,14 +40,12 @@ NanoClaw already isolates your agents in containers so they can't touch your hos
 ## Quick Start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/nanoclaw.git
+git clone https://github.com/yjkellyjoo/nanoclaw.git
 cd nanoclaw
 claude
 ```
 
 Then run `/setup`. Claude Code handles everything: dependencies, Status authentication, container setup and service configuration.
-
-> **Note:** Replace `YOUR_USERNAME` with your GitHub username if you've forked this repository.
 
 ### Status Setup
 
