@@ -1,0 +1,21 @@
+[Unit]
+Description=NanoClaw Assistant
+After=network-online.target status-backend.service
+Wants=network-online.target status-backend.service
+Requires=status-backend.service
+
+[Service]
+Type=simple
+# TODO: Replace with your username
+User=YOUR_USER
+Group=YOUR_USER
+# TODO: Replace with your NanoClaw installation path
+WorkingDirectory=/home/YOUR_USER/nanoclaw
+Environment=HOME=/home/YOUR_USER
+ExecStart=/usr/bin/npm run dev
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

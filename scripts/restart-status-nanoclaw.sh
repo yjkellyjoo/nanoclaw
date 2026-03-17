@@ -5,10 +5,8 @@ if [[ "${EUID}" -ne 0 ]]; then
   exec sudo "$0" "$@"
 fi
 
-# Determine the project directory (default to the parent of this script's directory)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="${NANOCLAW_PROJECT_DIR:-$(dirname "$SCRIPT_DIR")}"
-NANOCLAW_MATCH="${PROJECT_DIR}/node_modules/.bin/tsx src/index.ts"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+NANOCLAW_MATCH="tsx src/index.ts"
 status_services=(status-backend status-login)
 
 echo "Restarting Status services: ${status_services[*]}"
@@ -23,9 +21,7 @@ if systemctl list-unit-files --type=service | rg -q '^nanoclaw\.service'; then
 else
   echo "Restarting NanoClaw as a background process"
   pkill -f "${NANOCLAW_MATCH}" || true
-  # Get the current user (the one who owns the project directory)
-  PROJECT_OWNER="$(stat -c '%U' "${PROJECT_DIR}" 2>/dev/null || stat -f '%Su' "${PROJECT_DIR}" 2>/dev/null)"
-  runuser -u "${PROJECT_OWNER}" -- bash -lc \
+  runuser -u "$(logname)" -- bash -lc \
     "cd '${PROJECT_DIR}' && nohup npm run dev >/tmp/nanoclaw-dev.log 2>&1 &"
   nanoclaw_mode="process"
 fi
