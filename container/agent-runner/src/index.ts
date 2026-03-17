@@ -188,7 +188,12 @@ function createPreCompactHook(assistantName?: string): HookCallback {
 // Secrets to strip from Bash tool subprocess environments.
 // These are needed by claude-code for API auth but should never
 // be visible to commands Kit runs.
-const SECRET_ENV_VARS = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
+const SECRET_ENV_VARS = [
+  'ANTHROPIC_API_KEY',
+  'CLAUDE_CODE_OAUTH_TOKEN',
+  'CODEX_AUTH_JSON',
+  'GEMINI_API_KEY',
+];
 
 function createSanitizeBashHook(): HookCallback {
   return async (input, _toolUseId, _context) => {
@@ -446,6 +451,8 @@ async function runQuery(
             NANOCLAW_CHAT_JID: containerInput.chatJid,
             NANOCLAW_GROUP_FOLDER: containerInput.groupFolder,
             NANOCLAW_IS_MAIN: containerInput.isMain ? '1' : '0',
+            ...(containerInput.secrets?.CODEX_AUTH_JSON && { CODEX_AUTH_JSON: containerInput.secrets.CODEX_AUTH_JSON }),
+            ...(containerInput.secrets?.GEMINI_API_KEY && { GEMINI_API_KEY: containerInput.secrets.GEMINI_API_KEY }),
           },
         },
       },

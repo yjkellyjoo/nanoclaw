@@ -10,6 +10,8 @@ import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
 import { CronExpressionParser } from 'cron-parser';
+import { registerAskCodexTool } from './tools/ask-codex.js';
+import { registerAskGeminiTool } from './tools/ask-gemini.js';
 
 const IPC_DIR = '/workspace/ipc';
 const MESSAGES_DIR = path.join(IPC_DIR, 'messages');
@@ -38,6 +40,9 @@ const server = new McpServer({
   name: 'nanoclaw',
   version: '1.0.0',
 });
+
+registerAskCodexTool(server);
+registerAskGeminiTool(server);
 
 server.tool(
   'send_message',
