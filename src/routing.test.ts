@@ -16,7 +16,7 @@ describe('JID ownership patterns', () => {
   it('Status group JID: 32-byte hex public key', () => {
     const jid = '0x04a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12';
     expect(jid.startsWith('0x04')).toBe(true);
-    expect(jid.length).toBe(132); // 0x + 04 + 128 hex chars
+    expect(jid.length).toBe(128); // 0x04 prefix + 124 hex chars (62 bytes)
   });
 
   it('Status DM JID: user public key', () => {
