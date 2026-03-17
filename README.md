@@ -2,9 +2,9 @@
   <img src="assets/nanoclaw-logo.png" alt="NanoClaw" width="400">
   <br><br>
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://res.cloudinary.com/dhgck7ebz/image/upload/f_auto,c_limit,w_320,q_auto/Brand/Logo%20Section/Logo/Logo_04">
-    <source media="(prefers-color-scheme: light)" srcset="https://res.cloudinary.com/dhgck7ebz/image/upload/f_auto,c_limit,w_320,q_auto/Brand/Logo%20Section/Logo/Logo_03">
-    <img src="https://res.cloudinary.com/dhgck7ebz/image/upload/f_auto,c_limit,w_320,q_auto/Brand/Logo%20Section/Logo/Logo_03" alt="Status" width="200">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/status-logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/status-logo-light.png">
+    <img src="assets/status-logo-light.png" alt="Status" width="200">
   </picture>
 </p>
 
