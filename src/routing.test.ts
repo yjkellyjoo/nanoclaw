@@ -13,14 +13,15 @@ beforeEach(() => {
 describe('JID ownership patterns', () => {
   // These test the patterns that will become ownsJid() on the Channel interface
 
-  it('Status community JID: starts with community-', () => {
-    const jid = 'community-abc123';
-    expect(jid.startsWith('community-')).toBe(true);
+  it('Status group JID: 32-byte hex public key', () => {
+    const jid = '0x04a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12';
+    expect(jid.startsWith('0x04')).toBe(true);
+    expect(jid.length).toBe(128); // 0x04 prefix + 124 hex chars (62 bytes)
   });
 
-  it('Status user JID: starts with 0x', () => {
-    const jid = '0xabcdef1234567890';
-    expect(jid.startsWith('0x')).toBe(true);
+  it('Status DM JID: user public key', () => {
+    const jid = '0x04fedcba0987654321';
+    expect(jid.startsWith('0x04')).toBe(true);
   });
 });
 
@@ -29,21 +30,21 @@ describe('JID ownership patterns', () => {
 describe('getAvailableGroups', () => {
   it('returns only groups, excludes DMs', () => {
     storeChatMetadata(
-      'community-group-1',
+      'group10x04abcd',
       '2024-01-01T00:00:01.000Z',
       'Group 1',
       'status',
       true,
     );
     storeChatMetadata(
-      '0x1111111111111111',
+      'user0x04user',
       '2024-01-01T00:00:02.000Z',
       'User DM',
       'status',
       false,
     );
     storeChatMetadata(
-      'community-group-2',
+      'group20x04abcd',
       '2024-01-01T00:00:03.000Z',
       'Group 2',
       'status',
@@ -52,15 +53,15 @@ describe('getAvailableGroups', () => {
 
     const groups = getAvailableGroups();
     expect(groups).toHaveLength(2);
-    expect(groups.map((g) => g.jid)).toContain('community-group-1');
-    expect(groups.map((g) => g.jid)).toContain('community-group-2');
-    expect(groups.map((g) => g.jid)).not.toContain('0x1111111111111111');
+    expect(groups.map((g) => g.jid)).toContain('group10x04abcd');
+    expect(groups.map((g) => g.jid)).toContain('group20x04abcd');
+    expect(groups.map((g) => g.jid)).not.toContain('user0x04user');
   });
 
   it('excludes __group_sync__ sentinel', () => {
     storeChatMetadata('__group_sync__', '2024-01-01T00:00:00.000Z');
     storeChatMetadata(
-      'community-group',
+      'group0x04abcd',
       '2024-01-01T00:00:01.000Z',
       'Group',
       'status',
@@ -69,19 +70,19 @@ describe('getAvailableGroups', () => {
 
     const groups = getAvailableGroups();
     expect(groups).toHaveLength(1);
-    expect(groups[0].jid).toBe('community-group');
+    expect(groups[0].jid).toBe('group0x04abcd');
   });
 
   it('marks registered groups correctly', () => {
     storeChatMetadata(
-      'community-registered',
+      'reg0x04abcd',
       '2024-01-01T00:00:01.000Z',
       'Registered',
       'status',
       true,
     );
     storeChatMetadata(
-      'community-unregistered',
+      'unreg0x04abcd',
       '2024-01-01T00:00:02.000Z',
       'Unregistered',
       'status',
@@ -89,7 +90,7 @@ describe('getAvailableGroups', () => {
     );
 
     _setRegisteredGroups({
-      'community-registered': {
+      'reg0x04abcd': {
         name: 'Registered',
         folder: 'registered',
         trigger: '@Andy',
@@ -98,8 +99,8 @@ describe('getAvailableGroups', () => {
     });
 
     const groups = getAvailableGroups();
-    const reg = groups.find((g) => g.jid === 'community-registered');
-    const unreg = groups.find((g) => g.jid === 'community-unregistered');
+    const reg = groups.find((g) => g.jid === 'reg0x04abcd');
+    const unreg = groups.find((g) => g.jid === 'unreg0x04abcd');
 
     expect(reg?.isRegistered).toBe(true);
     expect(unreg?.isRegistered).toBe(false);
@@ -107,21 +108,21 @@ describe('getAvailableGroups', () => {
 
   it('returns groups ordered by most recent activity', () => {
     storeChatMetadata(
-      'community-old',
+      'old0x04abcd',
       '2024-01-01T00:00:01.000Z',
       'Old',
       'status',
       true,
     );
     storeChatMetadata(
-      'community-new',
+      'new0x04abcd',
       '2024-01-01T00:00:05.000Z',
       'New',
       'status',
       true,
     );
     storeChatMetadata(
-      'community-mid',
+      'mid0x04abcd',
       '2024-01-01T00:00:03.000Z',
       'Mid',
       'status',
@@ -129,9 +130,9 @@ describe('getAvailableGroups', () => {
     );
 
     const groups = getAvailableGroups();
-    expect(groups[0].jid).toBe('community-new');
-    expect(groups[1].jid).toBe('community-mid');
-    expect(groups[2].jid).toBe('community-old');
+    expect(groups[0].jid).toBe('new0x04abcd');
+    expect(groups[1].jid).toBe('mid0x04abcd');
+    expect(groups[2].jid).toBe('old0x04abcd');
   });
 
   it('excludes non-group chats regardless of JID format', () => {
@@ -151,7 +152,7 @@ describe('getAvailableGroups', () => {
     );
     // A real group for contrast
     storeChatMetadata(
-      'community-group',
+      'group0x04abcd',
       '2024-01-01T00:00:03.000Z',
       'Group',
       'status',
@@ -160,7 +161,7 @@ describe('getAvailableGroups', () => {
 
     const groups = getAvailableGroups();
     expect(groups).toHaveLength(1);
-    expect(groups[0].jid).toBe('community-group');
+    expect(groups[0].jid).toBe('group0x04abcd');
   });
 
   it('returns empty array when no chats exist', () => {

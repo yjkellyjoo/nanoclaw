@@ -110,12 +110,9 @@ function createSchema(database: Database.Database): void {
   try {
     database.exec(`ALTER TABLE chats ADD COLUMN channel TEXT`);
     database.exec(`ALTER TABLE chats ADD COLUMN is_group INTEGER DEFAULT 0`);
-    // Backfill from JID patterns
+    // Backfill from JID patterns - Status uses 0x-prefixed public keys
     database.exec(
-      `UPDATE chats SET channel = 'status', is_group = 1 WHERE jid LIKE 'community-%'`,
-    );
-    database.exec(
-      `UPDATE chats SET channel = 'status', is_group = 0 WHERE jid LIKE '0x%'`,
+      `UPDATE chats SET channel = 'status', is_group = 1 WHERE jid LIKE '0x04%'`,
     );
     database.exec(
       `UPDATE chats SET channel = 'discord', is_group = 1 WHERE jid LIKE 'dc:%'`,
@@ -263,7 +260,7 @@ export function storeMessage(msg: NewMessage): void {
 }
 
 /**
- * Store a message directly (for channels that do not use protocol-native message envelopes).
+ * Store a message directly (for channels that don't use Baileys proto).
  */
 export function storeMessageDirect(msg: {
   id: string;

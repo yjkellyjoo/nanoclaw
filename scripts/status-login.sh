@@ -6,12 +6,8 @@ set -euo pipefail
 PORT="${STATUS_PORT:-21405}"
 BASE="http://127.0.0.1:${PORT}"
 
-# Determine the project directory (default to the parent of this script's directory)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="${NANOCLAW_PROJECT_DIR:-$(dirname "$SCRIPT_DIR")}"
-
 # Source .env for credentials
-ENV_FILE="${STATUS_ENV_FILE:-${PROJECT_DIR}/.env}"
+ENV_FILE="${STATUS_ENV_FILE:-$(cd "$(dirname "$0")/.." && pwd)/.env}"
 if [[ -f "$ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
@@ -21,7 +17,7 @@ fi
 
 KEY_UID="${STATUS_KEY_UID:?STATUS_KEY_UID not set}"
 PASSWORD="${STATUS_PASSWORD:?STATUS_PASSWORD not set}"
-DATA_DIR="${STATUS_DATA_DIR:-${HOME}/.status-backend/data}"
+DATA_DIR="${STATUS_DATA_DIR:-$HOME/.status-backend/data}"
 
 echo "Waiting for status-backend to be ready..."
 for i in $(seq 1 30); do
