@@ -12,8 +12,8 @@ import { NewMessage } from './types.js';
 function makeMsg(overrides: Partial<NewMessage> = {}): NewMessage {
   return {
     id: '1',
-    chat_jid: 'community-default',
-    sender: '0xabcdef1234567890',
+    chat_jid: '0x04group123',
+    sender: '0x04alice456',
     sender_name: 'Alice',
     content: 'hello',
     timestamp: '2024-01-01T00:00:00.000Z',
