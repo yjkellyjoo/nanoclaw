@@ -158,8 +158,10 @@ export class StatusChannel implements Channel {
   ownsJid(jid: string): boolean {
     if (this.isStatusPublicKey(jid)) return true;
     const sep = jid.lastIndexOf('-');
-    if (sep === -1) return false;
-    return this.isStatusPublicKey(jid.slice(sep + 1));
+    if (sep !== -1 && this.isStatusPublicKey(jid.slice(sep + 1))) return true;
+    // Status group chat IDs may not contain a public key suffix —
+    // check if it's a known active chat from the Status backend.
+    return this.activeChats.some((c) => c.id === jid);
   }
 
   async disconnect(): Promise<void> {
@@ -325,15 +327,19 @@ export class StatusChannel implements Channel {
       return this.blockedDmChats.has(chat.id);
     }
 
+    // Registered groups always pass — the admin explicitly registered them
+    const groups = this.opts.registeredGroups();
+    if (groups[chat.id]) return false;
+
     if (this.isAllowedGroupChat(chat)) {
       this.loggedBlockedGroupChats.delete(chat.id);
       return false;
     }
 
     if (!this.loggedBlockedGroupChats.has(chat.id)) {
-      logger.debug(
+      logger.warn(
         { chatId: chat.id },
-        'Ignoring Status group chat without configured admin member',
+        'Ignoring Status group chat without configured admin member (check STATUS_ALLOW_FROM and members field)',
       );
       this.loggedBlockedGroupChats.add(chat.id);
     }
