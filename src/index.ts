@@ -3,12 +3,12 @@ import path from 'path';
 
 import {
   ASSISTANT_NAME,
+  GROUPS_DIR,
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   POLL_INTERVAL,
-  TRIGGER_PATTERN,
 } from './config.js';
-import { WhatsAppChannel } from './channels/whatsapp.js';
+import { StatusChannel } from './channels/status.js';
 import {
   ContainerOutput,
   runContainerAgent,
@@ -39,6 +39,7 @@ import { resolveGroupFolderPath } from './group-folder.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { startSchedulerLoop } from './task-scheduler.js';
+import { matchesGroupTrigger } from './trigger.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 
@@ -51,7 +52,7 @@ let registeredGroups: Record<string, RegisteredGroup> = {};
 let lastAgentTimestamp: Record<string, string> = {};
 let messageLoopRunning = false;
 
-let whatsapp: WhatsAppChannel;
+let status: StatusChannel;
 const channels: Channel[] = [];
 const queue = new GroupQueue();
 
@@ -94,6 +95,25 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
 
   // Create group folder
   fs.mkdirSync(path.join(groupDir, 'logs'), { recursive: true });
+
+  // Copy global CLAUDE.md template if it doesn't exist
+  const claudemdPath = path.join(groupDir, 'CLAUDE.md');
+  const globalTemplate = path.join(GROUPS_DIR, 'global', 'CLAUDE.md');
+
+  if (!fs.existsSync(claudemdPath) && fs.existsSync(globalTemplate)) {
+    try {
+      fs.copyFileSync(globalTemplate, claudemdPath);
+      logger.info(
+        { jid, folder: group.folder },
+        'Copied global CLAUDE.md template to new group',
+      );
+    } catch (err) {
+      logger.warn(
+        { jid, folder: group.folder, err },
+        'Failed to copy CLAUDE.md template',
+      );
+    }
+  }
 
   logger.info(
     { jid, name: group.name, folder: group.folder },
@@ -154,7 +174,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   // For non-main groups, check if trigger is required and present
   if (!isMainGroup && group.requiresTrigger !== false) {
     const hasTrigger = missedMessages.some((m) =>
-      TRIGGER_PATTERN.test(m.content.trim()),
+      matchesGroupTrigger(m.content, group.trigger),
     );
     if (!hasTrigger) return true;
   }
@@ -379,7 +399,7 @@ async function startMessageLoop(): Promise<void> {
           // context when a trigger eventually arrives.
           if (needsTrigger) {
             const hasTrigger = groupMessages.some((m) =>
-              TRIGGER_PATTERN.test(m.content.trim()),
+              matchesGroupTrigger(m.content, group.trigger),
             );
             if (!hasTrigger) continue;
           }
@@ -475,9 +495,9 @@ async function main(): Promise<void> {
   };
 
   // Create and connect channels
-  whatsapp = new WhatsAppChannel(channelOpts);
-  channels.push(whatsapp);
-  await whatsapp.connect();
+  status = new StatusChannel(channelOpts);
+  channels.push(status);
+  await status.connect();
 
   // Start subsystems (independently of connection handler)
   startSchedulerLoop({
@@ -504,8 +524,7 @@ async function main(): Promise<void> {
     },
     registeredGroups: () => registeredGroups,
     registerGroup,
-    syncGroupMetadata: (force) =>
-      whatsapp?.syncGroupMetadata(force) ?? Promise.resolve(),
+    syncGroupMetadata: (_force) => Promise.resolve(),
     getAvailableGroups,
     writeGroupsSnapshot: (gf, im, ag, rj) =>
       writeGroupsSnapshot(gf, im, ag, rj),
