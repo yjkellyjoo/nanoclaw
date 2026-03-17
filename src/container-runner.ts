@@ -100,6 +100,16 @@ function buildVolumeMounts(
     }
   }
 
+  // Shared workspace directory (read-write for all groups, including Main)
+  const sharedDir = path.join(GROUPS_DIR, 'shared');
+  if (fs.existsSync(sharedDir)) {
+    mounts.push({
+      hostPath: sharedDir,
+      containerPath: '/workspace/shared',
+      readonly: false,
+    });
+  }
+
   // Per-group Claude sessions directory (isolated from other groups)
   // Each group gets their own .claude/ to prevent cross-group session access
   const groupSessionsDir = path.join(
@@ -110,28 +120,32 @@ function buildVolumeMounts(
   );
   fs.mkdirSync(groupSessionsDir, { recursive: true });
   const settingsFile = path.join(groupSessionsDir, 'settings.json');
-  if (!fs.existsSync(settingsFile)) {
-    fs.writeFileSync(
-      settingsFile,
-      JSON.stringify(
-        {
-          env: {
-            // Enable agent swarms (subagent orchestration)
-            // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
-            CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-            // Load CLAUDE.md from additional mounted directories
-            // https://code.claude.com/docs/en/memory#load-memory-from-additional-directories
-            CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
-            // Enable Claude's memory feature (persists user preferences between sessions)
-            // https://code.claude.com/docs/en/memory#manage-auto-memory
-            CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
-          },
-        },
-        null,
-        2,
-      ) + '\n',
-    );
+  const defaultSettings = {
+    model: group.containerConfig?.model || 'claude-opus-4-6',
+    env: {
+      // Enable agent swarms (subagent orchestration)
+      // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
+      CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
+      // Load CLAUDE.md from additional mounted directories
+      // https://code.claude.com/docs/en/memory#load-memory-from-additional-directories
+      CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
+      // Enable Claude's memory feature (persists user preferences between sessions)
+      // https://code.claude.com/docs/en/memory#manage-auto-memory
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
+    },
+  };
+  // Always ensure required fields are present — the SDK inside containers
+  // can rewrite settings.json and drop the model field, causing fallback
+  // to its built-in default (Sonnet). Merge on every startup to fix this.
+  let currentSettings: Record<string, unknown> = {};
+  try {
+    currentSettings = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
+  } catch {
+    // File missing or corrupt — will be recreated from defaults
   }
+  const merged = { ...defaultSettings, ...currentSettings, model: defaultSettings.model };
+  merged.env = { ...defaultSettings.env, ...(currentSettings.env as Record<string, string> || {}) };
+  fs.writeFileSync(settingsFile, JSON.stringify(merged, null, 2) + '\n');
 
   // Sync skills from container/skills/ into each group's .claude/skills/
   const skillsSrc = path.join(process.cwd(), 'container', 'skills');
@@ -204,7 +218,28 @@ function buildVolumeMounts(
  * Secrets are never written to disk or mounted as files.
  */
 function readSecrets(): Record<string, string> {
-  return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
+  const secrets = readEnvFile([
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'ANTHROPIC_API_KEY',
+    'GEMINI_API_KEY',
+  ]);
+
+  // Read Codex CLI OAuth auth (ChatGPT Pro subscription — no API charges).
+  // Passed as a secret so the container never mounts the host auth file.
+  const codexAuthPath = path.join(
+    process.env.HOME || '/root',
+    '.codex',
+    'auth.json',
+  );
+  try {
+    const authContent = fs.readFileSync(codexAuthPath, 'utf-8');
+    JSON.parse(authContent); // validate
+    secrets.CODEX_AUTH_JSON = authContent;
+  } catch {
+    // No codex auth available — tool will report the error
+  }
+
+  return secrets;
 }
 
 function buildContainerArgs(
