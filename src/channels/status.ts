@@ -3,10 +3,14 @@
  * Communicates via local status-backend HTTP/WebSocket API.
  */
 
+import fs from 'fs';
+import path from 'path';
+
 import WebSocket from 'ws';
 
 import {
   ASSISTANT_NAME,
+  GROUPS_DIR,
   STATUS_ALLOW_FROM,
   STATUS_DATA_DIR,
   STATUS_KEY_UID,
@@ -18,12 +22,14 @@ import { logger } from '../logger.js';
 import {
   ActiveChat,
   ChatMessage,
+  ContentType,
   createOneToOneChat,
   getActiveChats,
   getAllChats,
   getChatMessages,
   getSettings,
   healthCheck,
+  imageTypeMeta,
   initializeApplication,
   loginAccount,
   sendOneToOneMessage,
@@ -33,6 +39,7 @@ import {
 } from '../status-api.js';
 import {
   Channel,
+  MediaAttachment,
   OnChatMetadata,
   OnInboundMessage,
   RegisteredGroup,
@@ -403,26 +410,80 @@ export class StatusChannel implements Channel {
     chatId: string,
     messages: ChatMessage[],
   ): void {
+    const groups = this.opts.registeredGroups();
+    const group = groups[chatId];
+
     for (const msg of messages) {
       if (!this.isDeliverableInboundMessage(msg)) continue;
+
+      let attachments: MediaAttachment[] | undefined;
+      if (msg.contentType === ContentType.IMAGE && msg.image?.payload) {
+        const saved = this.saveImageAttachment(msg, group);
+        if (saved) attachments = [saved];
+      }
+
+      const content =
+        msg.text ||
+        (attachments ? `[image: ${attachments[0].filename}]` : '');
 
       this.opts.onMessage(chatId, {
         id: msg.id,
         chat_jid: chatId,
         sender: msg.from,
         sender_name: msg.alias || msg.from.slice(0, 10),
-        content: msg.text,
+        content,
         timestamp: new Date(msg.timestamp).toISOString(),
         is_from_me: false,
         is_bot_message: false,
+        attachments,
       });
     }
   }
 
   private isDeliverableInboundMessage(msg: ChatMessage): boolean {
-    if (msg.contentType !== 1 || !msg.text) return false;
+    const isText = msg.contentType === ContentType.TEXT_PLAIN && !!msg.text;
+    const isImage =
+      msg.contentType === ContentType.IMAGE && !!msg.image?.payload;
+
+    if (!isText && !isImage) return false;
     if (this.botPublicKey && msg.from === this.botPublicKey) return false;
-    return !msg.text.startsWith(this.withAssistantPrefix(''));
+    if (msg.text && msg.text.startsWith(this.withAssistantPrefix('')))
+      return false;
+    return true;
+  }
+
+  private saveImageAttachment(
+    msg: ChatMessage,
+    group?: RegisteredGroup,
+  ): MediaAttachment | null {
+    if (!msg.image?.payload) return null;
+
+    const { ext, mime } = imageTypeMeta(msg.image.type);
+    const filename = `img-${msg.id.slice(0, 12)}.${ext}`;
+
+    // Save into the group's media directory (accessible from the container)
+    const groupFolder = group?.folder ?? 'unknown';
+    const mediaDir = path.join(GROUPS_DIR, groupFolder, 'media');
+    try {
+      fs.mkdirSync(mediaDir, { recursive: true });
+    } catch (err) {
+      logger.warn({ err, mediaDir }, 'Failed to create media directory');
+      return null;
+    }
+
+    const filePath = path.join(mediaDir, filename);
+    try {
+      const buffer = Buffer.from(msg.image.payload, 'base64');
+      fs.writeFileSync(filePath, buffer);
+      logger.info(
+        { filename, size: buffer.length, chatId: msg.chatId },
+        'Saved image attachment',
+      );
+      return { filename, path: filePath, mimeType: mime, size: buffer.length };
+    } catch (err) {
+      logger.warn({ err, filename }, 'Failed to save image attachment');
+      return null;
+    }
   }
 
   private isAdminFilterEnabled(): boolean {
