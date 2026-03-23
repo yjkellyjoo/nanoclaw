@@ -673,7 +673,7 @@ describe('StatusChannel', () => {
       mimeType: 'image/jpeg',
       size: Buffer.from(imagePayload, 'base64').length,
     });
-    expect(msg.attachments[0].path).toContain('media/img-img1-abcdef1.jpg');
+    expect(msg.attachments[0].path).toBe('media/img-img1-abcdef1.jpg');
   });
 
   it('pollMessages delivers image-only messages with placeholder content', async () => {

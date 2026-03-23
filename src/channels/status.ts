@@ -472,6 +472,9 @@ export class StatusChannel implements Channel {
     }
 
     const filePath = path.join(mediaDir, filename);
+    // Store path relative to group dir so it works inside containers
+    // (host: groups/{folder}/media/file, container: /workspace/group/media/file)
+    const relativePath = `media/${filename}`;
     try {
       const buffer = Buffer.from(msg.image.payload, 'base64');
       fs.writeFileSync(filePath, buffer);
@@ -479,7 +482,7 @@ export class StatusChannel implements Channel {
         { filename, size: buffer.length, chatId: msg.chatId },
         'Saved image attachment',
       );
-      return { filename, path: filePath, mimeType: mime, size: buffer.length };
+      return { filename, path: relativePath, mimeType: mime, size: buffer.length };
     } catch (err) {
       logger.warn({ err, filename }, 'Failed to save image attachment');
       return null;
