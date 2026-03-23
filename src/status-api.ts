@@ -3,7 +3,12 @@
  * Communicates with the local status-backend REST API.
  */
 
+import https from 'https';
+
 import { logger } from './logger.js';
+
+// status-go media server uses self-signed TLS on localhost
+const insecureAgent = new https.Agent({ rejectUnauthorized: false });
 
 interface RPCResponse {
   jsonrpc: string;
@@ -183,16 +188,6 @@ export const ImageType = {
   WEBP: 4,
 } as const;
 
-export interface ChatMessageImage {
-  /** Base64-encoded image payload */
-  payload: string;
-  /** ImageType enum value (1=JPEG, 2=PNG, 3=GIF, 4=WEBP) */
-  type: number;
-  width?: number;
-  height?: number;
-  albumId?: string;
-}
-
 export interface ChatMessage {
   id: string;
   text: string;
@@ -203,8 +198,49 @@ export interface ChatMessage {
   localChatId: string;
   contentType: number;
   responseTo: string;
-  /** Present when contentType === IMAGE (7) */
-  image?: ChatMessageImage;
+  /** Media server URL when contentType === IMAGE (7) */
+  image?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  albumId?: string;
+}
+
+/**
+ * Fetch image bytes from the status-go media server.
+ * The `image` field on ChatMessage is a URL like:
+ *   https://localhost:<port>/messages/images?messageId=0x...
+ * TLS is self-signed, so we skip certificate verification.
+ */
+export function fetchImageFromMediaServer(
+  imageUrl: string,
+): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  return new Promise((resolve) => {
+    https.get(imageUrl, { agent: insecureAgent }, (res) => {
+      if (res.statusCode !== 200) {
+        logger.warn(
+          { imageUrl, status: res.statusCode },
+          'Failed to fetch image from media server',
+        );
+        res.resume(); // drain
+        resolve(null);
+        return;
+      }
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        const mimeType = res.headers['content-type'] || 'image/jpeg';
+        resolve({ buffer, mimeType });
+      });
+      res.on('error', (err) => {
+        logger.warn({ err, imageUrl }, 'Error reading image response');
+        resolve(null);
+      });
+    }).on('error', (err) => {
+      logger.warn({ err, imageUrl }, 'Error fetching image from media server');
+      resolve(null);
+    });
+  });
 }
 
 export interface ChatMessagesResponse {

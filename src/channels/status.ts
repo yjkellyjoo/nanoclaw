@@ -24,12 +24,12 @@ import {
   ChatMessage,
   ContentType,
   createOneToOneChat,
+  fetchImageFromMediaServer,
   getActiveChats,
   getAllChats,
   getChatMessages,
   getSettings,
   healthCheck,
-  imageTypeMeta,
   initializeApplication,
   loginAccount,
   sendOneToOneMessage,
@@ -416,34 +416,51 @@ export class StatusChannel implements Channel {
     for (const msg of messages) {
       if (!this.isDeliverableInboundMessage(msg)) continue;
 
-      let attachments: MediaAttachment[] | undefined;
-      if (msg.contentType === ContentType.IMAGE && msg.image?.payload && group) {
-        const saved = this.saveImageAttachment(msg, group);
-        if (saved) attachments = [saved];
+      // Queue image download asynchronously — fire-and-forget per message
+      if (msg.contentType === ContentType.IMAGE && msg.image && group) {
+        this.processImageMessage(chatId, msg, group);
+        continue;
       }
-
-      const content =
-        msg.text ||
-        (attachments ? `[image: ${attachments[0].filename}]` : '');
 
       this.opts.onMessage(chatId, {
         id: msg.id,
         chat_jid: chatId,
         sender: msg.from,
         sender_name: msg.alias || msg.from.slice(0, 10),
-        content,
+        content: msg.text,
         timestamp: new Date(msg.timestamp).toISOString(),
         is_from_me: false,
         is_bot_message: false,
-        attachments,
       });
     }
   }
 
+  private async processImageMessage(
+    chatId: string,
+    msg: ChatMessage,
+    group: RegisteredGroup,
+  ): Promise<void> {
+    const attachment = await this.downloadImageAttachment(msg, group);
+    const attachments = attachment ? [attachment] : undefined;
+    const content =
+      msg.text || (attachment ? `[image: ${attachment.filename}]` : '[image]');
+
+    this.opts.onMessage(chatId, {
+      id: msg.id,
+      chat_jid: chatId,
+      sender: msg.from,
+      sender_name: msg.alias || msg.from.slice(0, 10),
+      content,
+      timestamp: new Date(msg.timestamp).toISOString(),
+      is_from_me: false,
+      is_bot_message: false,
+      attachments,
+    });
+  }
+
   private isDeliverableInboundMessage(msg: ChatMessage): boolean {
     const isText = msg.contentType === ContentType.TEXT_PLAIN && !!msg.text;
-    const isImage =
-      msg.contentType === ContentType.IMAGE && !!msg.image?.payload;
+    const isImage = msg.contentType === ContentType.IMAGE && !!msg.image;
 
     if (!isText && !isImage) return false;
     if (this.botPublicKey && msg.from === this.botPublicKey) return false;
@@ -452,21 +469,30 @@ export class StatusChannel implements Channel {
     return true;
   }
 
-  private saveImageAttachment(
+  private async downloadImageAttachment(
     msg: ChatMessage,
     group: RegisteredGroup,
-  ): MediaAttachment | null {
-    if (!msg.image?.payload) return null;
+  ): Promise<MediaAttachment | null> {
+    if (!msg.image) return null;
 
-    const { ext, mime } = imageTypeMeta(msg.image.type);
+    const result = await fetchImageFromMediaServer(msg.image);
+    if (!result) return null;
+
+    // Determine extension from MIME type
+    const extMap: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+    };
+    const ext = extMap[result.mimeType] || 'jpg';
+
     // Sanitize msg.id — it comes from the network and could contain path separators
     const safeStem =
       msg.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 12) || 'img';
     const filename = `img-${safeStem}.${ext}`;
 
-    // Save into the group's media directory (accessible from the container)
-    const groupFolder = group.folder;
-    const mediaDir = path.join(GROUPS_DIR, groupFolder, 'media');
+    const mediaDir = path.join(GROUPS_DIR, group.folder, 'media');
     try {
       fs.mkdirSync(mediaDir, { recursive: true });
     } catch (err) {
@@ -476,16 +502,19 @@ export class StatusChannel implements Channel {
 
     const filePath = path.join(mediaDir, filename);
     // Store path relative to group dir so it works inside containers
-    // (host: groups/{folder}/media/file, container: /workspace/group/media/file)
     const relativePath = `media/${filename}`;
     try {
-      const buffer = Buffer.from(msg.image.payload, 'base64');
-      fs.writeFileSync(filePath, buffer);
+      fs.writeFileSync(filePath, result.buffer);
       logger.info(
-        { filename, size: buffer.length, chatId: msg.chatId },
+        { filename, size: result.buffer.length, chatId: msg.chatId },
         'Saved image attachment',
       );
-      return { filename, path: relativePath, mimeType: mime, size: buffer.length };
+      return {
+        filename,
+        path: relativePath,
+        mimeType: result.mimeType,
+        size: result.buffer.length,
+      };
     } catch (err) {
       logger.warn({ err, filename }, 'Failed to save image attachment');
       return null;

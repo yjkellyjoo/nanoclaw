@@ -15,15 +15,7 @@ const statusApiMocks = vi.hoisted(() => ({
   sendChatMessage: vi.fn(),
   sendGroupChatMessage: vi.fn(),
   ContentType: { TEXT_PLAIN: 1, STICKER: 2, IMAGE: 7, AUDIO: 8 },
-  imageTypeMeta: vi.fn((type: number) => {
-    const meta: Record<number, { ext: string; mime: string }> = {
-      1: { ext: 'jpg', mime: 'image/jpeg' },
-      2: { ext: 'png', mime: 'image/png' },
-      3: { ext: 'gif', mime: 'image/gif' },
-      4: { ext: 'webp', mime: 'image/webp' },
-    };
-    return meta[type] ?? { ext: 'bin', mime: 'application/octet-stream' };
-  }),
+  fetchImageFromMediaServer: vi.fn(),
 }));
 
 const wsState = vi.hoisted(() => ({
@@ -133,6 +125,7 @@ describe('StatusChannel', () => {
     statusApiMocks.sendOneToOneMessage.mockResolvedValue(undefined);
     statusApiMocks.sendChatMessage.mockResolvedValue(undefined);
     statusApiMocks.sendGroupChatMessage.mockResolvedValue(undefined);
+    statusApiMocks.fetchImageFromMediaServer.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -614,7 +607,12 @@ describe('StatusChannel', () => {
       { id: '0xallowed', name: 'Allowed', chatType: 1 },
     ]);
 
-    const imagePayload = Buffer.from('fake-image-data').toString('base64');
+    const fakeImageBuffer = Buffer.from('fake-image-data');
+    statusApiMocks.fetchImageFromMediaServer.mockResolvedValue({
+      buffer: fakeImageBuffer,
+      mimeType: 'image/jpeg',
+    });
+
     const firstPoll = [
       {
         id: 'old1',
@@ -641,7 +639,9 @@ describe('StatusChannel', () => {
         localChatId: '0xallowed',
         contentType: 7,
         responseTo: '',
-        image: { payload: imagePayload, type: 1, width: 800, height: 600 },
+        image: 'https://localhost:43735/messages/images?messageId=0ximg1',
+        imageWidth: 800,
+        imageHeight: 600,
       },
     ];
 
@@ -660,7 +660,11 @@ describe('StatusChannel', () => {
 
     // Second poll: should deliver image message with attachment
     await (channel as any).pollMessages();
-    expect(onMessage).toHaveBeenCalledTimes(1);
+
+    // processImageMessage is async — wait for it
+    await vi.waitFor(() => {
+      expect(onMessage).toHaveBeenCalledTimes(1);
+    });
 
     const call = onMessage.mock.calls[0];
     expect(call[0]).toBe('0xallowed');
@@ -671,7 +675,7 @@ describe('StatusChannel', () => {
     expect(msg.attachments[0]).toMatchObject({
       filename: 'img-img1-abcdef1.jpg',
       mimeType: 'image/jpeg',
-      size: Buffer.from(imagePayload, 'base64').length,
+      size: fakeImageBuffer.length,
     });
     expect(msg.attachments[0].path).toBe('media/img-img1-abcdef1.jpg');
   });
@@ -688,7 +692,12 @@ describe('StatusChannel', () => {
       { id: '0xallowed', name: 'Allowed', chatType: 1 },
     ]);
 
-    const imagePayload = Buffer.from('png-data').toString('base64');
+    const fakeImageBuffer = Buffer.from('png-data');
+    statusApiMocks.fetchImageFromMediaServer.mockResolvedValue({
+      buffer: fakeImageBuffer,
+      mimeType: 'image/png',
+    });
+
     const firstPoll = [
       {
         id: 'seed',
@@ -715,7 +724,7 @@ describe('StatusChannel', () => {
         localChatId: '0xallowed',
         contentType: 7,
         responseTo: '',
-        image: { payload: imagePayload, type: 2 },
+        image: 'https://localhost:43735/messages/images?messageId=0ximg2',
       },
     ];
 
@@ -731,14 +740,17 @@ describe('StatusChannel', () => {
     await (channel as any).pollMessages();
     await (channel as any).pollMessages();
 
-    expect(onMessage).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(onMessage).toHaveBeenCalledTimes(1);
+    });
+
     const msg = onMessage.mock.calls[0][1];
     expect(msg.content).toBe('[image: img-img2-xyz789a.png]');
     expect(msg.attachments).toHaveLength(1);
     expect(msg.attachments[0].mimeType).toBe('image/png');
   });
 
-  it('pollMessages skips image messages without payload', async () => {
+  it('pollMessages skips image messages without URL', async () => {
     const onMessage = vi.fn();
     const opts = createOpts({ onMessage });
     const channel = new StatusChannel(opts);
@@ -767,7 +779,7 @@ describe('StatusChannel', () => {
     const secondPoll = [
       ...firstPoll,
       {
-        id: 'img-nopayload',
+        id: 'img-nourl',
         text: '',
         from: '0xallowed',
         alias: 'Admin',
@@ -776,7 +788,6 @@ describe('StatusChannel', () => {
         localChatId: '0xallowed',
         contentType: 7,
         responseTo: '',
-        image: { type: 1 },
       },
     ];
 
