@@ -42,6 +42,17 @@ export interface RegisteredGroup {
   requiresTrigger?: boolean; // Default: true for groups, false for solo chats
 }
 
+export interface MediaAttachment {
+  /** Unique filename on disk (e.g. "img-abc123.jpg") */
+  filename: string;
+  /** Absolute path where the file was saved in the group workspace */
+  path: string;
+  /** MIME type (e.g. "image/jpeg") */
+  mimeType: string;
+  /** Size in bytes */
+  size: number;
+}
+
 export interface NewMessage {
   id: string;
   chat_jid: string;
@@ -51,6 +62,8 @@ export interface NewMessage {
   timestamp: string;
   is_from_me?: boolean;
   is_bot_message?: boolean;
+  /** Media files attached to this message (images, etc.) */
+  attachments?: MediaAttachment[];
 }
 
 export interface ScheduledTask {
