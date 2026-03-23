@@ -417,7 +417,7 @@ export class StatusChannel implements Channel {
       if (!this.isDeliverableInboundMessage(msg)) continue;
 
       let attachments: MediaAttachment[] | undefined;
-      if (msg.contentType === ContentType.IMAGE && msg.image?.payload) {
+      if (msg.contentType === ContentType.IMAGE && msg.image?.payload && group) {
         const saved = this.saveImageAttachment(msg, group);
         if (saved) attachments = [saved];
       }
@@ -454,15 +454,18 @@ export class StatusChannel implements Channel {
 
   private saveImageAttachment(
     msg: ChatMessage,
-    group?: RegisteredGroup,
+    group: RegisteredGroup,
   ): MediaAttachment | null {
     if (!msg.image?.payload) return null;
 
     const { ext, mime } = imageTypeMeta(msg.image.type);
-    const filename = `img-${msg.id.slice(0, 12)}.${ext}`;
+    // Sanitize msg.id — it comes from the network and could contain path separators
+    const safeStem =
+      msg.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 12) || 'img';
+    const filename = `img-${safeStem}.${ext}`;
 
     // Save into the group's media directory (accessible from the container)
-    const groupFolder = group?.folder ?? 'unknown';
+    const groupFolder = group.folder;
     const mediaDir = path.join(GROUPS_DIR, groupFolder, 'media');
     try {
       fs.mkdirSync(mediaDir, { recursive: true });

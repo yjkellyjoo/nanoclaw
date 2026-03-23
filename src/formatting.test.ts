@@ -110,7 +110,7 @@ describe('formatMessages', () => {
         attachments: [
           {
             filename: 'img-abc123.jpg',
-            path: '/groups/main/media/img-abc123.jpg',
+            path: 'media/img-abc123.jpg',
             mimeType: 'image/jpeg',
             size: 4096,
           },
@@ -121,7 +121,7 @@ describe('formatMessages', () => {
     expect(result).toContain('<attachment filename="img-abc123.jpg"');
     expect(result).toContain('type="image/jpeg"');
     expect(result).toContain('size="4096"');
-    expect(result).toContain('path="/groups/main/media/img-abc123.jpg"');
+    expect(result).toContain('path="media/img-abc123.jpg"');
   });
 
   it('includes multiple attachments when present', () => {
