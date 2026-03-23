@@ -102,6 +102,57 @@ describe('formatMessages', () => {
     const result = formatMessages([]);
     expect(result).toBe('<messages>\n\n</messages>');
   });
+
+  it('includes attachment XML when message has attachments', () => {
+    const result = formatMessages([
+      makeMsg({
+        content: 'check this photo',
+        attachments: [
+          {
+            filename: 'img-abc123.jpg',
+            path: '/groups/main/media/img-abc123.jpg',
+            mimeType: 'image/jpeg',
+            size: 4096,
+          },
+        ],
+      }),
+    ]);
+    expect(result).toContain('check this photo');
+    expect(result).toContain('<attachment filename="img-abc123.jpg"');
+    expect(result).toContain('type="image/jpeg"');
+    expect(result).toContain('size="4096"');
+    expect(result).toContain('path="/groups/main/media/img-abc123.jpg"');
+  });
+
+  it('includes multiple attachments when present', () => {
+    const result = formatMessages([
+      makeMsg({
+        content: 'album',
+        attachments: [
+          {
+            filename: 'img-1.jpg',
+            path: '/media/img-1.jpg',
+            mimeType: 'image/jpeg',
+            size: 1000,
+          },
+          {
+            filename: 'img-2.png',
+            path: '/media/img-2.png',
+            mimeType: 'image/png',
+            size: 2000,
+          },
+        ],
+      }),
+    ]);
+    expect(result).toContain('filename="img-1.jpg"');
+    expect(result).toContain('filename="img-2.png"');
+    expect(result).toContain('type="image/png"');
+  });
+
+  it('omits attachment element when no attachments', () => {
+    const result = formatMessages([makeMsg({ content: 'text only' })]);
+    expect(result).not.toContain('<attachment');
+  });
 });
 
 // --- TRIGGER_PATTERN ---

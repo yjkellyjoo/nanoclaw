@@ -14,6 +14,16 @@ const statusApiMocks = vi.hoisted(() => ({
   sendOneToOneMessage: vi.fn(),
   sendChatMessage: vi.fn(),
   sendGroupChatMessage: vi.fn(),
+  ContentType: { TEXT_PLAIN: 1, STICKER: 2, IMAGE: 7, AUDIO: 8 },
+  imageTypeMeta: vi.fn((type: number) => {
+    const meta: Record<number, { ext: string; mime: string }> = {
+      1: { ext: 'jpg', mime: 'image/jpeg' },
+      2: { ext: 'png', mime: 'image/png' },
+      3: { ext: 'gif', mime: 'image/gif' },
+      4: { ext: 'webp', mime: 'image/webp' },
+    };
+    return meta[type] ?? { ext: 'bin', mime: 'application/octet-stream' };
+  }),
 }));
 
 const wsState = vi.hoisted(() => ({
@@ -28,6 +38,7 @@ const wsState = vi.hoisted(() => ({
 
 vi.mock('../config.js', () => ({
   ASSISTANT_NAME: 'Andy',
+  GROUPS_DIR: '/tmp/nanoclaw-test-groups',
   STATUS_ALLOW_FROM: ['0xallowed'],
   STATUS_DATA_DIR: '/tmp/status-data',
   STATUS_KEY_UID: 'key-uid',
@@ -46,6 +57,13 @@ vi.mock('../logger.js', () => ({
 }));
 
 vi.mock('../status-api.js', () => statusApiMocks);
+
+vi.mock('fs', () => ({
+  default: {
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn(),
+  },
+}));
 
 vi.mock('ws', () => ({
   default: vi.fn(function (url: string) {
@@ -581,5 +599,199 @@ describe('StatusChannel', () => {
       '0x04a2',
       `${ASSISTANT_NAME}: second`,
     );
+  });
+
+  it('pollMessages delivers image messages with attachments', async () => {
+    const onMessage = vi.fn();
+    const onChatMetadata = vi.fn();
+    const opts = createOpts({ onMessage, onChatMetadata });
+    const channel = new StatusChannel(opts);
+
+    (channel as any).connected = true;
+    (channel as any).botPublicKey = '0xbot';
+
+    statusApiMocks.getActiveChats.mockResolvedValue([
+      { id: '0xallowed', name: 'Allowed', chatType: 1 },
+    ]);
+
+    const imagePayload = Buffer.from('fake-image-data').toString('base64');
+    const firstPoll = [
+      {
+        id: 'old1',
+        text: 'priming',
+        from: '0xallowed',
+        alias: 'Admin',
+        timestamp: 1000,
+        chatId: '0xallowed',
+        localChatId: '0xallowed',
+        contentType: 1,
+        responseTo: '',
+      },
+    ];
+
+    const secondPoll = [
+      ...firstPoll,
+      {
+        id: 'img1-abcdef123456',
+        text: 'check this',
+        from: '0xallowed',
+        alias: 'Admin',
+        timestamp: 2000,
+        chatId: '0xallowed',
+        localChatId: '0xallowed',
+        contentType: 7,
+        responseTo: '',
+        image: { payload: imagePayload, type: 1, width: 800, height: 600 },
+      },
+    ];
+
+    let pollCount = 0;
+    statusApiMocks.getChatMessages.mockImplementation(async () => {
+      pollCount++;
+      return {
+        messages: pollCount === 1 ? firstPoll : secondPoll,
+        cursor: '',
+      };
+    });
+
+    // First poll: prime cursor
+    await (channel as any).pollMessages();
+    expect(onMessage).not.toHaveBeenCalled();
+
+    // Second poll: should deliver image message with attachment
+    await (channel as any).pollMessages();
+    expect(onMessage).toHaveBeenCalledTimes(1);
+
+    const call = onMessage.mock.calls[0];
+    expect(call[0]).toBe('0xallowed');
+
+    const msg = call[1];
+    expect(msg.content).toBe('check this');
+    expect(msg.attachments).toHaveLength(1);
+    expect(msg.attachments[0]).toMatchObject({
+      filename: 'img-img1-abcdef1.jpg',
+      mimeType: 'image/jpeg',
+      size: Buffer.from(imagePayload, 'base64').length,
+    });
+    expect(msg.attachments[0].path).toContain('media/img-img1-abcdef1.jpg');
+  });
+
+  it('pollMessages delivers image-only messages with placeholder content', async () => {
+    const onMessage = vi.fn();
+    const opts = createOpts({ onMessage });
+    const channel = new StatusChannel(opts);
+
+    (channel as any).connected = true;
+    (channel as any).botPublicKey = '0xbot';
+
+    statusApiMocks.getActiveChats.mockResolvedValue([
+      { id: '0xallowed', name: 'Allowed', chatType: 1 },
+    ]);
+
+    const imagePayload = Buffer.from('png-data').toString('base64');
+    const firstPoll = [
+      {
+        id: 'seed',
+        text: 'seed',
+        from: '0xallowed',
+        alias: 'Admin',
+        timestamp: 1000,
+        chatId: '0xallowed',
+        localChatId: '0xallowed',
+        contentType: 1,
+        responseTo: '',
+      },
+    ];
+
+    const secondPoll = [
+      ...firstPoll,
+      {
+        id: 'img2-xyz789abcdef',
+        text: '',
+        from: '0xallowed',
+        alias: 'Admin',
+        timestamp: 2000,
+        chatId: '0xallowed',
+        localChatId: '0xallowed',
+        contentType: 7,
+        responseTo: '',
+        image: { payload: imagePayload, type: 2 },
+      },
+    ];
+
+    let pollCount = 0;
+    statusApiMocks.getChatMessages.mockImplementation(async () => {
+      pollCount++;
+      return {
+        messages: pollCount === 1 ? firstPoll : secondPoll,
+        cursor: '',
+      };
+    });
+
+    await (channel as any).pollMessages();
+    await (channel as any).pollMessages();
+
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    const msg = onMessage.mock.calls[0][1];
+    expect(msg.content).toBe('[image: img-img2-xyz789a.png]');
+    expect(msg.attachments).toHaveLength(1);
+    expect(msg.attachments[0].mimeType).toBe('image/png');
+  });
+
+  it('pollMessages skips image messages without payload', async () => {
+    const onMessage = vi.fn();
+    const opts = createOpts({ onMessage });
+    const channel = new StatusChannel(opts);
+
+    (channel as any).connected = true;
+    (channel as any).botPublicKey = '0xbot';
+
+    statusApiMocks.getActiveChats.mockResolvedValue([
+      { id: '0xallowed', name: 'Allowed', chatType: 1 },
+    ]);
+
+    const firstPoll = [
+      {
+        id: 'seed',
+        text: 'seed',
+        from: '0xallowed',
+        alias: 'Admin',
+        timestamp: 1000,
+        chatId: '0xallowed',
+        localChatId: '0xallowed',
+        contentType: 1,
+        responseTo: '',
+      },
+    ];
+
+    const secondPoll = [
+      ...firstPoll,
+      {
+        id: 'img-nopayload',
+        text: '',
+        from: '0xallowed',
+        alias: 'Admin',
+        timestamp: 2000,
+        chatId: '0xallowed',
+        localChatId: '0xallowed',
+        contentType: 7,
+        responseTo: '',
+        image: { type: 1 },
+      },
+    ];
+
+    let pollCount = 0;
+    statusApiMocks.getChatMessages.mockImplementation(async () => {
+      pollCount++;
+      return {
+        messages: pollCount === 1 ? firstPoll : secondPoll,
+        cursor: '',
+      };
+    });
+
+    await (channel as any).pollMessages();
+    await (channel as any).pollMessages();
+
+    expect(onMessage).not.toHaveBeenCalled();
   });
 });

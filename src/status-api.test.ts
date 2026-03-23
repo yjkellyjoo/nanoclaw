@@ -501,4 +501,34 @@ describe('status-api', () => {
       );
     });
   });
+
+  describe('imageTypeMeta', () => {
+    it('returns jpeg metadata for type 1', async () => {
+      const api = await import('./status-api.js');
+      expect(api.imageTypeMeta(1)).toEqual({ ext: 'jpg', mime: 'image/jpeg' });
+    });
+
+    it('returns png metadata for type 2', async () => {
+      const api = await import('./status-api.js');
+      expect(api.imageTypeMeta(2)).toEqual({ ext: 'png', mime: 'image/png' });
+    });
+
+    it('returns gif metadata for type 3', async () => {
+      const api = await import('./status-api.js');
+      expect(api.imageTypeMeta(3)).toEqual({ ext: 'gif', mime: 'image/gif' });
+    });
+
+    it('returns webp metadata for type 4', async () => {
+      const api = await import('./status-api.js');
+      expect(api.imageTypeMeta(4)).toEqual({ ext: 'webp', mime: 'image/webp' });
+    });
+
+    it('returns fallback for unknown types', async () => {
+      const api = await import('./status-api.js');
+      expect(api.imageTypeMeta(99)).toEqual({
+        ext: 'bin',
+        mime: 'application/octet-stream',
+      });
+    });
+  });
 });
