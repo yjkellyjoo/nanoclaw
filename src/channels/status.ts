@@ -477,7 +477,6 @@ export class StatusChannel implements Channel {
     const result = await fetchImageFromMediaServer(msg.image);
     if (!result) return null;
 
-    // Determine extension from MIME type
     const extMap: Record<string, string> = {
       'image/jpeg': 'jpg',
       'image/png': 'png',

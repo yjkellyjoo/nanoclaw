@@ -158,34 +158,12 @@ export async function sendGroupChatMessage(
   }
 }
 
-const IMAGE_TYPE_META: Record<number, { ext: string; mime: string }> = {
-  1: { ext: 'jpg', mime: 'image/jpeg' },
-  2: { ext: 'png', mime: 'image/png' },
-  3: { ext: 'gif', mime: 'image/gif' },
-  4: { ext: 'webp', mime: 'image/webp' },
-};
-
-/** Map a status-go ImageType value to file extension and MIME type. */
-export function imageTypeMeta(
-  imageType: number,
-): { ext: string; mime: string } {
-  return IMAGE_TYPE_META[imageType] ?? { ext: 'bin', mime: 'application/octet-stream' };
-}
-
 /** status-go protobuf ContentType enum values */
 export const ContentType = {
   TEXT_PLAIN: 1,
   STICKER: 2,
   IMAGE: 7,
   AUDIO: 8,
-} as const;
-
-/** status-go protobuf ImageType enum values */
-export const ImageType = {
-  JPEG: 1,
-  PNG: 2,
-  GIF: 3,
-  WEBP: 4,
 } as const;
 
 export interface ChatMessage {
