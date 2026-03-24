@@ -323,7 +323,7 @@ export class StatusChannel implements Channel {
       );
 
       if (!groups[chatId]) continue;
-      this.forwardInboundMessages(chatId, newMessages);
+      await this.forwardInboundMessages(chatId, newMessages);
     }
   }
 
@@ -406,19 +406,18 @@ export class StatusChannel implements Channel {
     return newMessages;
   }
 
-  private forwardInboundMessages(
+  private async forwardInboundMessages(
     chatId: string,
     messages: ChatMessage[],
-  ): void {
+  ): Promise<void> {
     const groups = this.opts.registeredGroups();
     const group = groups[chatId];
 
     for (const msg of messages) {
       if (!this.isDeliverableInboundMessage(msg)) continue;
 
-      // Queue image download asynchronously — fire-and-forget per message
       if (msg.contentType === ContentType.IMAGE && msg.image && group) {
-        this.processImageMessage(chatId, msg, group);
+        await this.processImageMessage(chatId, msg, group);
         continue;
       }
 
